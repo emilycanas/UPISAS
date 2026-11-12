@@ -1,8 +1,14 @@
+import platform
+
 from UPISAS.exemplar import Exemplar
 
 # ADDED AFTERWARDS:
 # UPISAS/exemplars/ramses.py points UPISAS at http://localhost:50000 and starts the scenario with these settings. 
 # Download the image first with docker pull, and use your own architecture in its name.
+
+# arm64 on Apple Silicon Macs, amd64 on Intel/AMD (Windows, Linux, Intel Macs)
+ARCH = "arm64" if platform.machine().lower() in ("arm64", "aarch64") else "amd64"
+
 
 class RAMSES(Exemplar):
     """
@@ -11,8 +17,7 @@ class RAMSES(Exemplar):
     def __init__(self, auto_start=False, container_name="upisas-demo"):
         docker_config = {
             "name": "simulation-scenario",
-            #"image": "giamburrasca/scenario1:arm64", -- FOR MACOS
-            "image": "giamburrasca/scenario1:amd64",
+            "image": f"giamburrasca/scenario1:{ARCH}",
             "network": "ramses-sas-net",
             "environment": {
                 "ADAPT": "0",

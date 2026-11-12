@@ -5,20 +5,36 @@ from UPISAS.strategy import Strategy
 # In plan(), decide what to do in the given scenario to beat the baseline strategy's availability.
 
 class MyStrategy(Strategy):
+    def __init__(self, exemplar):
+        super().__init__(exemplar)
+        self.last_add = None
 
-    def analyze(self):
+    def analyze(self): # pyright: ignore[reportIncompatibleMethodOverride]
         data = self.knowledge.monitored_data
-        print(data)
-        mean_f = sum(data["f"])/len(data["f"])
-        print("[Analysis]\tmean_f: " + str(mean_f))
-        if mean_f > 0:
-            self.knowledge.analysis_data["mean_f"] = mean_f
-            return True
-        return False
+        latest = data["services"][-1]
 
-    def plan(self):
-        data = self.knowledge.analysis_data["mean_f"]
-        if data > 0:
-            self.knowledge.plan_data = {"x": 2, "y": 5}
+        # Case 1: the restaurant service has disappeard from the data
+        if "RESTAURANT-SERVICE" not in latest:
+            print("[Analyze]: restaurant service is gone")
             return True
+        
+        restaurant = latest["RESTAURANT-SERVICE"]
+        instances = restaurant["snapshot"]
+
+        # Case 2: look at each instance and check whether any of them works
+        found_active_instance = False
+        for instance in instances:
+            status = instance["status"]
+            print(f"[Analyze]: restaurant instance status: {status}")
+            if status == "ACTIVE" or status == "BOOTING":
+                found_active_instance = True
+
+        if found_active_instance:
+            return False
+
+        print("[Analyze]: no active restaurant instance")
+        return True
+
+
+    def plan(self): # pyright: ignore[reportIncompatibleMethodOverride]
         return False
