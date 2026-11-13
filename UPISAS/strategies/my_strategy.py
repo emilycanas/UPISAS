@@ -1,4 +1,5 @@
 from UPISAS.strategy import Strategy
+import time
 
 # UPISAS/strategies/my_strategy.py 
 # In analyze(), use the monitored data to detect that RESTAURANT-SERVICE has lost its instance. 
@@ -37,4 +38,19 @@ class MyStrategy(Strategy):
 
 
     def plan(self): # pyright: ignore[reportIncompatibleMethodOverride]
-        return False
+         # Don't add another instance if we added one less than 60 seconds ago
+        if self.last_add is not None and time.monotonic() - self.last_add < 60:
+            print("[Plan]: already started an instance, waiting for it to boot")
+            return False
+
+        self.knowledge.plan_data = {
+            "operation": "addInstances",
+            "parameters": {
+                "serviceImplementationName": "restaurant-service",
+                "numberOfInstances": 1,
+            },
+        }
+        self.last_add = time.monotonic()
+        print(f"[Plan]: starting a new restaurant-service instance")
+        return True
+
