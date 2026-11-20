@@ -11,7 +11,7 @@ Glue between UPISAS/RAMSES and the MPC Controller V2:
 '''
 
 from UPISAS.strategy import Strategy
-from UPISAS.strategies.mpc_controller_v2 import MPCController, MPCConfig, ServiceGoals
+from UPISAS.strategies.mpc_controller import MPCController, MPCConfig, ServiceGoals
 from UPISAS.strategies.mpc_logging import RunLogger
 from contextlib import redirect_stdout
 from datetime import datetime
@@ -31,7 +31,7 @@ CONFIG = MPCConfig(
     horizon=5,               # 5 rounds ahead
     boot_steps=2,            # TODO: measure this (B's actuator test) and set it here
     max_load_per_instance=None,   #TODO: set from a load test if the linear model is too optimistic
-    learning_rounds=10,      # learning phase; with 5 s rounds + 3 warm-up
+    learning_rounds=5,      # learning phase; with 5 s rounds + 3 warm-up
 )
 
 SCALE_COOLDOWN_S = 80
