@@ -1,4 +1,4 @@
-A custom longer RAMSES scenario.
+A custom RAMSES scenario, ten minutes but all possible changes in `application.properties` happen.
 
 # Using this scenario
 ## Prerequisites
@@ -12,10 +12,10 @@ Need:
 Build with:
 
 1. `gradle build`
-2. `docker build -t custom-scenario .`
+2. `docker build -t custom-scenario1 .`
 
 Then run:
 
-```docker run -P -d --network ramses-sas-net custom-scenario```
+```docker run -P -d --network ramses-sas-net custom-scenario1```
 
 Copied / adapted from the `managed-system/rest-client` in https://zenodo.org/records/10400821.
