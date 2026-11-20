@@ -23,6 +23,10 @@ public class FailureInjectionService {
     private Integer failureInjection2Start;
     @Value("${FAILURE_INJECTION_2_DURATION}")
     private Integer failureInjection2Duration;
+    @Value("${FAILURE_INJECTION_3_START}")
+    private Integer failureInjection3Start;
+    @Value("${FAILURE_INJECTION_3_DURATION}")
+    private Integer failureInjection3Duration;
     @Value("${ID_OF_INSTANCE_TO_FAIL}")
     private String idOfInstanceToFail;
 
@@ -41,6 +45,8 @@ public class FailureInjectionService {
         log.info("failureInjection1Duration: {}", failureInjection1Duration);
         log.info("failureInjection2Start: {}", failureInjection2Start);
         log.info("failureInjection2Duration: {}", failureInjection2Duration);
+        log.info("failureInjection3Start: {}", failureInjection3Start);
+        log.info("failureInjection3Duration: {}", failureInjection3Duration);
         log.info("idOfInstanceToFail: {}", idOfInstanceToFail);
 
         if (injectFailure) {
@@ -76,9 +82,30 @@ public class FailureInjectionService {
                 }
             };
 
+            TimerTask failureInjection3StartTask = new TimerTask() {
+                @Override
+                public void run() {
+                    log.info("failureInjection3Start: injecting failure");
+                    adaptationController.stopInstance(idOfInstanceToFail);
+                }
+            };
+            TimerTask failureInjection3StopTask = new TimerTask() {
+                @Override
+                public void run() {
+                    log.info("failureInjection3Stop: restoring instance after failure injection");
+                    adaptationController.startInstance(idOfInstanceToFail);
+                }
+            };
+
             timer.schedule(failureInjection1StartTask, failureInjection1Start * 1000L);
             if (failureInjection1Duration != 0)
                 timer.schedule(failureInjection1StopTask, (failureInjection1Start+failureInjection1Duration) * 1000L);
+            timer.schedule(failureInjection2StartTask, failureInjection2Start * 1000L);
+            if (failureInjection2Duration != 0)
+                timer.schedule(failureInjection2StopTask, (failureInjection2Start+failureInjection2Duration) * 1000L);
+            timer.schedule(failureInjection3StartTask, failureInjection3Start * 1000L);
+            if (failureInjection3Duration != 0)
+                timer.schedule(failureInjection3StopTask, (failureInjection3Start+failureInjection3Duration) * 1000L);
         }
     }
 
