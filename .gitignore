@@ -6,5 +6,5 @@ __pycache__
 UPISAS/experiment_runner_configs/experiments
 .venv
 
-/custom-scenario/build
-/custom-scenario/.gradle
+build
+.gradle
