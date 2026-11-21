@@ -5,6 +5,7 @@ venv
 __pycache__
 UPISAS/experiment_runner_configs/experiments
 .venv
-
 build
 .gradle
+results/
+logs/
