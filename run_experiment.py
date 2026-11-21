@@ -7,11 +7,11 @@ from UPISAS.run_recorder import RunRecorder
 
 # ---------- Settings: change these for each run ----------
 STRATEGY = "naive"       # "empty" (no adaptation) or "naive" (baseline); later "mpc"
-SCENARIO = "default"     # name for the result files only, it does not change the scenario
-RUN_SECONDS = 300        # 5 minutes, like the Challenge 2 scenarios
+SCENARIO = "custom2"     # "default", "custom1" or "custom2" (see SCENARIOS in ramses.py)
 ROUND_SECONDS = 5        # one monitor round every 5 s
 
-exemplar = RAMSES()
+# The scenario decides the image, its settings and how long the run lasts
+exemplar = RAMSES(SCENARIO)
 
 # Pick the strategy. "empty" still needs a Strategy object, because monitor()
 # lives in Strategy, but it never adapts (see the loop below).
@@ -26,7 +26,7 @@ exemplar.start_run()
 recorder = RunRecorder(STRATEGY, SCENARIO)
 
 start = time.monotonic()
-while time.monotonic() - start < RUN_SECONDS:
+while time.monotonic() - start < exemplar.run_seconds:
     try:
         strategy.monitor(with_validation=False)
         recorder.record(strategy.knowledge.monitored_data)

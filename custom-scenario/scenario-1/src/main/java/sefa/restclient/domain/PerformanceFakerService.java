@@ -1,6 +1,8 @@
 package sefa.restclient.domain;
 
+import com.netflix.appinfo.InstanceInfo;
 import com.netflix.discovery.EurekaClient;
+import com.netflix.discovery.shared.Application;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -195,46 +197,54 @@ public class PerformanceFakerService {
         }
     }
 
+    /**
+     * Current sleep of every ordering instance that answers.
+     * Changed from the RAMSES original: an instance that does not answer (still
+     * booting, or stopped but still in Eureka) is skipped. The original called
+     * System.exit(1) here, which ended the whole scenario, so no more requests
+     * were sent for the rest of the run.
+     */
     private Map<String, Double> getSleepForOrderingServiceInstances() {
         Map<String, Double> instancesOriginalSleep = new HashMap<>();
-        try {
-            discoveryClient.getApplication("ORDERING-SERVICE").getInstances().forEach(instance -> {
-                String url = "http://" + instance.getHostName() + ":" + instance.getPort() + "/rest/instrumentation/sleepMean";
+        for (InstanceInfo instance : orderingInstances()) {
+            String url = "http://" + instance.getHostName() + ":" + instance.getPort() + "/rest/instrumentation/sleepMean";
+            try {
                 RestTemplate restTemplate = new RestTemplate();
-                instancesOriginalSleep.put(instance.getInstanceId(), Double.parseDouble(Objects.requireNonNull(restTemplate.getForObject(url, String.class))));
-                log.info("Initial sleep for instance {}: {}", instance.getInstanceId(), instancesOriginalSleep.get(instance.getInstanceId()));
-            });
-        } catch (Exception e) {
-            log.error("Error while slowing down ordering", e);
-            System.exit(1);
+                Double sleep = Double.parseDouble(Objects.requireNonNull(restTemplate.getForObject(url, String.class)));
+                instancesOriginalSleep.put(instance.getInstanceId(), sleep);
+                log.info("Initial sleep for instance {}: {}", instance.getInstanceId(), sleep);
+            } catch (Exception e) {
+                log.warn("Skipping ordering instance {}: it did not answer ({})", instance.getInstanceId(), e.getMessage());
+            }
         }
         return instancesOriginalSleep;
     }
-    
-    private void changeSleepForOrderingServiceInstances(Double sleepMean) {
-        try {
-            discoveryClient.getApplication("ORDERING-SERVICE").getInstances().forEach(instance -> {
-                Double originalSleep = originalInstancesSleeps.get(instance.getInstanceId());
-                if (originalSleep == null) return;
 
-                String url = "http://" + instance.getHostName() + ":" + instance.getPort() + "/rest/instrumentation/sleepMean?sleepMean={sleepMean}";
+    /** Sets the sleep of every ordering instance to its original sleep + sleepMean, skipping instances that do not answer. */
+    private void changeSleepForOrderingServiceInstances(Double sleepMean) {
+        for (InstanceInfo instance : orderingInstances()) {
+            Double originalSleep = originalInstancesSleeps.get(instance.getInstanceId());
+            if (originalSleep == null) {
+                continue;   // was not reachable when the slowdown started
+            }
+            String url = "http://" + instance.getHostName() + ":" + instance.getPort() + "/rest/instrumentation/sleepMean?sleepMean={sleepMean}";
+            log.info("Changing sleep for instance {} from {} to {}", instance.getInstanceId(), originalSleep, sleepMean + originalSleep);
+            try {
                 RestTemplate restTemplate = new RestTemplate();
-                log.info("Changing sleep for instance {} from {} to {}", instance.getInstanceId(), originalSleep, sleepMean+originalSleep);
-                try {
-                    restTemplate.put(url, null, Map.of("sleepMean", String.valueOf(originalSleep+sleepMean)));
-                } catch (Exception e) {
-                    if (sleepMean == 0.0) {
-                        log.error("Error while restoring ordering. The instance {} could have been shutdown", instance.getInstanceId());
-                    } else {
-                        log.error("Error while slowing down ordering", e);
-                        System.exit(1);
-                    }
-                }
-            });
-        } catch (Exception e) {
-            log.error("Error while slowing down ordering", e);
-            System.exit(1);
+                restTemplate.put(url, null, Map.of("sleepMean", String.valueOf(originalSleep + sleepMean)));
+            } catch (Exception e) {
+                log.warn("Could not change the sleep of ordering instance {} (it may have been shut down): {}", instance.getInstanceId(), e.getMessage());
+            }
         }
+    }
+
+    /** The ordering instances Eureka knows about (an empty list if none). */
+    private List<InstanceInfo> orderingInstances() {
+        Application application = discoveryClient.getApplication("ORDERING-SERVICE");
+        if (application == null) {
+            return new ArrayList<>();
+        }
+        return application.getInstances();
     }
 
 }
