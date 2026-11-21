@@ -42,10 +42,11 @@ class RunRecorder:
         # Running totals for the summary at the end
         self.total_requests = 0
         self.total_successes = 0
-        self.rounds_with_data = 0       # rounds where ordering got new requests
+        self.rounds_with_data = 0       # rounds that count for 'time within 800 ms' (with requests, or ordering up but no traffic)
         self.rounds_within_limit = 0    # of those, rounds with response time <= 800 ms
         self.total_instances = 0        # sum of all instance counts of all rounds
         self.rounds_recorded = 0
+        self.traffic_started = False    # becomes True at the first round with requests
         
 
     """
@@ -56,15 +57,17 @@ class RunRecorder:
         requests = 0
         successes = 0
         duration = 0.0
+        new_snapshot = False   # True if at least one instance has a fresh snapshot
 
         if ordering_service is None or ordering_service["snapshot"] is None:
-            return requests, successes, duration   # no data this round
+            return requests, successes, duration, new_snapshot   # no data this round
 
         for instance in ordering_service["snapshot"]:
             instance_id = instance["instanceId"]
 
             if self.previous_timestamp.get(instance_id) == instance["timestamp"]:
                 continue
+            new_snapshot = True   # this instance has a fresh snapshot
 
             # Add up the cumulative counters of this instance over all endpoints. Only successful requests (status < 500) count for the duration,
             # like in the naive strategy: failed requests are often fast and would make ordering look quicker than it is.
@@ -100,13 +103,13 @@ class RunRecorder:
             successes += delta_successes
             duration += delta_duration
 
-        return requests, successes, duration
+        return requests, successes, duration, new_snapshot
 
     def record(self, monitored_data):
         latest = monitored_data["services"][-1]
         time_s = round(time.monotonic() - self.start_time, 1)
 
-        requests, successes, duration = self.ordering_this_round(latest.get("ORDERING-SERVICE"))
+        requests, successes, duration, new_snapshot = self.ordering_this_round(latest.get("ORDERING-SERVICE"))
 
         availability = None
         if requests > 0:
@@ -130,11 +133,18 @@ class RunRecorder:
         self.total_requests += requests
         self.total_successes += successes
         if requests > 0:
+            self.traffic_started = True
             self.rounds_with_data += 1
             # A round where every request failed has no response time:
             # it counts as a round with data, but not as within the limit
-            if successes > 0 and response_time is not None and response_time <= MAX_RESPONSE_TIME:
+            if response_time is not None and response_time <= MAX_RESPONSE_TIME:
                 self.rounds_within_limit += 1
+        elif new_snapshot and self.traffic_started:
+            # Ordering is up (its snapshot is new) but got no requests at all: they
+            # never reached it, e.g. because no restaurant instance was running.
+            # Ordering served nothing, so this round counts as outside the limit
+            # instead of being skipped. Rounds before the load started don't count.
+            self.rounds_with_data += 1
         for count in instance_counts:
             self.total_instances += count
         self.rounds_recorded += 1
